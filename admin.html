@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — Gestión de Curso</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f13;--bg2:#16161d;--bg3:#1e1e28;
+  --border:#2a2a38;--text:#e4e4f0;--muted:#6b6b85;--subtle:#3a3a50;
+  --primary:#6366f1;--primary-h:#4f46e5;
+  --green:#22c55e;--red:#ef4444;--amber:#f59e0b;
+}
+html,body{height:100%;font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+button{cursor:pointer;font:inherit;color:inherit}
+input,select,textarea{font:inherit;color:inherit}
+input:focus,select:focus,textarea:focus{outline:none}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+/* LAYOUT */
+#wrap{display:flex;height:100vh;overflow:hidden}
+#sb{width:220px;min-width:220px;background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#topbar{height:50px;background:rgba(15,15,19,.9);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:10px;flex-shrink:0}
+#content{flex:1;overflow-y:auto;padding:22px}
+
+/* SIDEBAR */
+.sb-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:9px}
+.sb-icon{width:30px;height:30px;border-radius:9px;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.sb-title{font-weight:700;font-size:13px}
+.sb-nav{flex:1;padding:8px;display:flex;flex-direction:column;gap:1px;overflow-y:auto}
+.ni{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:9px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border:1px solid transparent;transition:all .12s}
+.ni:hover{color:var(--text);background:var(--bg3)}
+.ni.on{color:#818cf8;background:rgba(99,102,241,.12);border-color:rgba(99,102,241,.2)}
+.ni svg{width:14px;height:14px;flex-shrink:0}
+.sb-sep{padding:10px 9px 3px;font-size:10px;color:var(--subtle);text-transform:uppercase;letter-spacing:.07em;font-weight:600}
+
+/* TOPBAR */
+#page-name{font-weight:600;font-size:14px;flex:1}
+.tb-badge{background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.25);color:#818cf8;border-radius:7px;padding:2px 9px;font-size:11px;font-weight:600}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:9px;font-size:13px;font-weight:500;border:1px solid transparent;transition:all .12s}
+.btn-p{background:var(--primary);color:#fff;box-shadow:0 0 14px rgba(99,102,241,.25)}
+.btn-p:hover{background:var(--primary-h)}
+.btn-s{background:var(--bg3);border-color:var(--border);color:var(--text)}
+.btn-s:hover{border-color:rgba(99,102,241,.3)}
+.btn-g{color:var(--muted);border:none;background:none}
+.btn-g:hover{color:var(--text);background:var(--bg3);border-radius:7px}
+.btn-d{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.25);color:#f87171}
+.btn-d:hover{background:var(--red);color:#fff}
+.btn-sm{padding:4px 9px;font-size:12px;border-radius:7px}
+.btn-ic{padding:5px;border-radius:7px;border:none;background:none;color:var(--muted)}
+.btn-ic:hover{color:var(--text);background:var(--bg3)}
+
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:13px;padding:16px}
+.ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.ct{font-weight:600;font-size:13px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.ga{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px}
+
+/* STAT */
+.sc{background:var(--bg2);border:1px solid var(--border);border-radius:13px;padding:14px;display:flex;justify-content:space-between;align-items:flex-start}
+.sl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:5px}
+.sv{font-size:20px;font-weight:700}
+.si{padding:8px;border-radius:9px;display:flex;align-items:center;justify-content:center}
+.si svg{width:15px;height:15px}
+.si-i{background:rgba(99,102,241,.12);color:#818cf8}
+.si-g{background:rgba(34,197,94,.12);color:#4ade80}
+.si-r{background:rgba(239,68,68,.12);color:#f87171}
+.si-a{background:rgba(245,158,11,.12);color:#fbbf24}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:500}
+.b-i{background:rgba(99,102,241,.12);color:#818cf8;border:1px solid rgba(99,102,241,.2)}
+.b-g{background:rgba(34,197,94,.12);color:#4ade80;border:1px solid rgba(34,197,94,.2)}
+.b-r{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.2)}
+.b-a{background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.2)}
+.b-m{background:var(--bg3);color:var(--muted);border:1px solid var(--border)}
+
+/* TABLE */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead tr{border-bottom:1px solid var(--border)}
+th{text-align:left;padding:9px 11px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;white-space:nowrap}
+tbody tr{border-bottom:1px solid rgba(42,42,56,.4);transition:background .1s}
+tbody tr:hover{background:var(--bg3)}
+tbody tr:hover .ra{opacity:1}
+td{padding:9px 11px;font-size:13px}
+.ra{display:flex;gap:2px;opacity:0;transition:opacity .12s}
+
+/* FORM */
+.f{display:flex;flex-direction:column;gap:4px}
+.f label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.f input,.f select,.f textarea{background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:13px;color:var(--text);width:100%;transition:border-color .12s}
+.f input:focus,.f select:focus,.f textarea:focus{border-color:var(--primary)}
+.f textarea{resize:vertical;min-height:68px}
+.fr{display:grid;gap:11px}
+.fr2{grid-template-columns:1fr 1fr}
+.fr3{grid-template-columns:1fr 1fr 1fr}
+
+/* MODAL */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(5px);z-index:200;display:flex;align-items:center;justify-content:center;padding:14px;opacity:0;pointer-events:none;transition:opacity .18s}
+.mo.open{opacity:1;pointer-events:all}
+.md{background:var(--bg2);border:1px solid var(--border);border-radius:15px;width:100%;max-height:88vh;display:flex;flex-direction:column;transform:scale(.96) translateY(6px);transition:transform .18s;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.mo.open .md{transform:scale(1) translateY(0)}
+.md-sm{max-width:380px}.md-md{max-width:540px}.md-lg{max-width:700px}
+.mh{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0}
+.mh h3{font-weight:600;font-size:14px}
+.mb{padding:18px;overflow-y:auto;display:flex;flex-direction:column;gap:12px}
+.mf{display:flex;gap:8px;justify-content:flex-end;padding:14px 18px;border-top:1px solid var(--border);flex-shrink:0}
+
+/* TABS */
+.tabs{display:flex;gap:2px;background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:3px;width:fit-content}
+.tab{padding:4px 12px;border-radius:6px;font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;border:none;background:none;transition:all .12s}
+.tab.on{background:var(--primary);color:#fff}
+
+/* PAGE */
+.page{display:none;flex-direction:column;gap:18px;animation:fu .18s ease}
+.page.on{display:flex}
+@keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.ph{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.pt{font-size:20px;font-weight:700}
+.ps{font-size:12px;color:var(--muted);margin-top:2px}
+
+/* OP CARD */
+.oc{background:var(--bg2);border:1px solid var(--border);border-radius:13px;overflow:hidden}
+.oc:hover{border-color:rgba(99,102,241,.2)}
+.oc-h{display:flex;align-items:flex-start;justify-content:space-between;padding:14px;gap:10px}
+.oc-a{display:flex;gap:3px;opacity:0;transition:opacity .12s}
+.oc:hover .oc-a{opacity:1}
+.movs{border-top:1px solid var(--border);display:none}
+.movs.open{display:block}
+.movs-inner{padding:10px 14px;display:flex;flex-direction:column;gap:4px}
+.mov{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:8px}
+.mov:hover{background:var(--bg3)}
+.mov:hover .mov-del{opacity:1}
+.mov-del{opacity:0;transition:opacity .12s}
+
+/* PROGRESS */
+.pr{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.pr-n{width:110px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pr-b{flex:1;height:5px;background:var(--bg3);border-radius:99px;overflow:hidden}
+.pr-f{height:100%;background:linear-gradient(90deg,var(--primary),#a78bfa);border-radius:99px}
+.pr-p{width:32px;font-size:11px;color:var(--muted);text-align:right}
+.pr-m{width:80px;font-size:12px;font-weight:600;color:#4ade80;text-align:right}
+
+/* PTS INPUT */
+.pi-row{display:flex;align-items:center;gap:8px;padding:6px 9px;background:var(--bg);border-radius:9px}
+.pi-row span{flex:1;font-size:13px}
+.pi-inp{width:64px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:3px 7px;font-size:13px;text-align:center;color:#818cf8}
+
+/* TOGGLE */
+.tgl{display:flex;align-items:center;gap:9px;cursor:pointer}
+.tgl-track{width:36px;height:19px;background:var(--border);border-radius:99px;position:relative;transition:background .18s;flex-shrink:0}
+.tgl-track.on{background:var(--primary)}
+.tgl-track::after{content:'';position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:transform .18s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.tgl-track.on::after{transform:translateX(17px)}
+
+/* AVATAR */
+.av{display:flex;align-items:center;justify-content:center;border-radius:50%;background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.3);font-size:11px;font-weight:700;color:#818cf8;flex-shrink:0}
+
+/* MISC */
+.txt-g{color:#4ade80}.txt-r{color:#f87171}.txt-a{color:#fbbf24}.txt-i{color:#818cf8}
+.fw{font-weight:600}.muted{color:var(--muted)}.sm{font-size:12px}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;gap:8px;color:var(--muted)}
+.empty svg{width:20px;height:20px;margin-bottom:2px;opacity:.5}
+.sbox{position:relative;flex:1;max-width:280px}
+.sbox input{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:6px 11px 6px 30px;font-size:13px;color:var(--text)}
+.sbox input:focus{border-color:var(--primary);outline:none}
+.sbox svg{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--subtle);width:13px;height:13px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* TOAST */
+#toast{position:fixed;bottom:20px;right:20px;z-index:999;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+.ti{background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:9px 14px;font-size:13px;display:flex;align-items:center;gap:7px;box-shadow:0 6px 20px rgba(0,0,0,.4);transform:translateX(110%);transition:transform .25s;min-width:200px}
+.ti.show{transform:translateX(0)}
+
+@media(max-width:800px){
+  #sb{display:none}
+  .g4{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr}
+  .fr2,.fr3{grid-template-columns:1fr}
+  #content{padding:14px}
+}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+
+<div id="wrap">
+<!-- SIDEBAR -->
+<aside id="sb">
+  <div class="sb-head">
+    <div class="sb-icon">⭐</div>
+    <div>
+      <div class="sb-title" id="sb-nombre">Mi Curso</div>
+      <div style="font-size:10px;color:var(--muted)">Panel Admin</div>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <div class="ni on" onclick="nav('dashboard',this)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</div>
+    <div class="ni" onclick="nav('participantes',this)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Participantes</div>
+    <div class="ni" onclick="nav('jornadas',this)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Jornadas</div>
+    <div class="ni" onclick="nav('proyectos',this)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Proyectos</div>
+    <div class="ni" onclick="nav('ingresos',this)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>Ingresos</div>
+    <div class="ni" onclick="nav('gastos',this)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>Gastos</div>
+    <div class="ni" onclick="nav('reparto',this)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Reparto</div>
+    <div class="ni" onclick="nav('inventario',this)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>Inventario</div>
+    <div class="ni" onclick="nav('anuncios',this)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Anuncios</div>
+    <div class="sb-sep">Config</div>
+    <div class="ni" onclick="nav('config',this)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 3v2M12 19v2M3 12H1M23 12h-2"/></svg>Configuración</div>
+  </nav>
+</aside>
+
+<!-- MAIN -->
+<div id="main">
+  <div id="topbar">
+    <span id="page-name">Dashboard</span>
+    <span class="tb-badge">⚡ Admin</span>
+  </div>
+  <div id="content">
+
+  <!-- DASHBOARD -->
+  <div class="page on" id="p-dashboard">
+    <div class="ph"><div><div class="pt">Dashboard</div><div class="ps">Resumen general</div></div></div>
+    <div class="g4">
+      <div class="sc"><div><div class="sl">Balance</div><div class="sv" id="d-bal">$0</div></div><div class="si si-g"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div></div>
+      <div class="sc"><div><div class="sl">Ingresos</div><div class="sv txt-g" id="d-ing">$0</div></div><div class="si si-g"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg></div></div>
+      <div class="sc"><div><div class="sl">Gastos</div><div class="sv txt-r" id="d-gas">$0</div></div><div class="si si-r"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/></svg></div></div>
+      <div class="sc"><div><div class="sl">Puntos totales</div><div class="sv txt-a" id="d-pts">0</div></div><div class="si si-a"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div></div>
+    </div>
+    <div class="g2">
+      <div class="card"><div class="ch"><div class="ct">Ranking de participantes</div></div><div id="d-ranking"></div></div>
+      <div class="card"><div class="ch"><div class="ct">Próximas jornadas</div></div><div id="d-proximas"></div></div>
+    </div>
+    <div class="card"><div class="ch"><div class="ct">Anuncios recientes</div></div><div id="d-anuncios"></div></div>
+  </div>
+
+  <!-- PARTICIPANTES -->
+  <div class="page" id="p-participantes">
+    <div class="ph">
+      <div><div class="pt">Participantes</div><div class="ps" id="p-cnt">0 alumnos</div></div>
+      <button class="btn btn-p" onclick="openM('m-p');resetFormP()"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Agregar alumno</button>
+    </div>
+    <div class="row">
+      <div class="sbox"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" id="sp" placeholder="Buscar..." oninput="renderP()"></div>
+    </div>
+    <div class="card"><div class="tw"><table>
+      <thead><tr><th>#</th><th>Nombre</th><th>Puntos</th><th>%</th><th>Estimado</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="tb-p"></tbody>
+    </table></div></div>
+  </div>
+
+  <!-- JORNADAS -->
+  <div class="page" id="p-jornadas">
+    <div class="ph">
+      <div><div class="pt">Jornadas</div><div class="ps" id="j-cnt">0 jornadas</div></div>
+      <button class="btn btn-p" onclick="openM('m-j');resetFormJ()"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nueva jornada</button>
+    </div>
+    <div class="row">
+      <div class="tabs" id="tabs-j">
+        <button class="tab on" onclick="jtab('todas',this)">Todas</button>
+        <button class="tab" onclick="jtab('futuras',this)">Próximas</button>
+        <button class="tab" onclick="jtab('pasadas',this)">Realizadas</button>
+      </div>
+    </div>
+    <div class="ga" id="grid-j"></div>
+  </div>
+
+  <!-- PROYECTOS -->
+  <div class="page" id="p-proyectos">
+    <div class="ph">
+      <div><div class="pt">Proyectos</div><div class="ps" id="proy-cnt">0 proyectos</div></div>
+      <button class="btn btn-p" onclick="openM('m-proy');resetFormProy()"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nuevo proyecto</button>
+    </div>
+    <div class="tabs">
+      <button class="tab on" onclick="proytab('activos',this)">Activos</button>
+      <button class="tab" onclick="proytab('finalizados',this)">Finalizados</button>
+    </div>
+    <div class="ga" id="grid-proy"></div>
+  </div>
+
+  <!-- INGRESOS -->
+  <div class="page" id="p-ingresos">
+    <div class="ph">
+      <div><div class="pt">Ingresos</div><div class="ps txt-g fw" id="total-ing">$0 total</div></div>
+      <button class="btn btn-p" onclick="openOpModal('ingreso')"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nueva operación</button>
+    </div>
+    <div class="tabs"><button class="tab on" onclick="fintab('ingreso','activas',this)">Activas</button><button class="tab" onclick="fintab('ingreso','finalizadas',this)">Finalizadas</button></div>
+    <div id="list-ing"></div>
+  </div>
+
+  <!-- GASTOS -->
+  <div class="page" id="p-gastos">
+    <div class="ph">
+      <div><div class="pt">Gastos</div><div class="ps txt-r fw" id="total-gas">$0 total</div></div>
+      <button class="btn btn-p" onclick="openOpModal('gasto')"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nueva operación</button>
+    </div>
+    <div class="tabs"><button class="tab on" onclick="fintab('gasto','activas',this)">Activas</button><button class="tab" onclick="fintab('gasto','finalizadas',this)">Finalizadas</button></div>
+    <div id="list-gas"></div>
+  </div>
+
+  <!-- REPARTO -->
+  <div class="page" id="p-reparto">
+    <div class="ph"><div><div class="pt">Reparto de ganancias</div><div class="ps">Calculá cuánto le corresponde a cada alumno</div></div></div>
+    <div class="card">
+      <div class="ch"><div class="ct">Simulador</div></div>
+      <div class="row" style="margin-bottom:14px">
+        <input type="number" id="sim-in" placeholder="Monto a repartir (vacío = balance actual)" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:9px;padding:7px 11px;font-size:13px;color:var(--text)">
+        <button class="btn btn-p" onclick="renderReparto()">Calcular</button>
+      </div>
+      <div id="sim-res"></div>
+    </div>
+    <div class="card">
+      <div class="ch"><div class="ct">Tabla completa</div></div>
+      <div class="tw"><table>
+        <thead><tr><th>#</th><th>Alumno</th><th>Puntos</th><th>%</th><th>Monto estimado</th></tr></thead>
+        <tbody id="tb-reparto"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- INVENTARIO -->
+  <div class="page" id="p-inventario">
+    <div class="ph">
+      <div><div class="pt">Inventario</div><div class="ps" id="inv-cnt">0 productos</div></div>
+      <button class="btn btn-p" onclick="openM('m-inv');resetFormInv()"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Agregar producto</button>
+    </div>
+    <div class="card"><div class="tw"><table>
+      <thead><tr><th>Producto</th><th>Categoría</th><th>Stock</th><th>P.Compra</th><th>P.Venta</th><th>Ganancia</th><th>Obs.</th><th></th></tr></thead>
+      <tbody id="tb-inv"></tbody>
+    </table></div></div>
+  </div>
+
+  <!-- ANUNCIOS -->
+  <div class="page" id="p-anuncios">
+    <div class="ph">
+      <div><div class="pt">Anuncios</div><div class="ps" id="an-cnt">0 publicaciones</div></div>
+      <button class="btn btn-p" onclick="openM('m-an')"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Publicar anuncio</button>
+    </div>
+    <div class="ga" id="grid-an"></div>
+  </div>
+
+  <!-- CONFIG -->
+  <div class="page" id="p-config">
+    <div class="ph"><div><div class="pt">Configuración</div><div class="ps">Ajustes de la plataforma</div></div></div>
+    <div class="g2">
+      <div class="card">
+        <div class="ch"><div class="ct">General</div></div>
+        <div style="display:flex;flex-direction:column;gap:11px">
+          <div class="f"><label>Nombre del curso</label><input id="cfg-nombre" placeholder="Mi Curso"></div>
+          <div class="f"><label>Año / Período</label><input id="cfg-anio" placeholder="2025"></div>
+          <button class="btn btn-p" onclick="saveConfig()">Guardar</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Qué ven los alumnos</div></div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <label class="tgl" onclick="tcfg('mostrarRanking')"><div class="tgl-track on" id="t-mostrarRanking"></div><span>Mostrar ranking</span></label>
+          <label class="tgl" onclick="tcfg('mostrarBalance')"><div class="tgl-track on" id="t-mostrarBalance"></div><span>Mostrar balance</span></label>
+          <label class="tgl" onclick="tcfg('mostrarDinero')"><div class="tgl-track on" id="t-mostrarDinero"></div><span>Mostrar dinero estimado</span></label>
+          <label class="tgl" onclick="tcfg('mostrarJornadas')"><div class="tgl-track on" id="t-mostrarJornadas"></div><span>Mostrar jornadas</span></label>
+          <label class="tgl" onclick="tcfg('mostrarProyectos')"><div class="tgl-track on" id="t-mostrarProyectos"></div><span>Mostrar proyectos</span></label>
+          <button class="btn btn-p" style="margin-top:4px" onclick="saveConfig()">Guardar</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch"><div class="ct">Exportar datos</div></div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button class="btn btn-s" onclick="exportJSON()">📥 Todo en JSON</button>
+          <button class="btn btn-s" onclick="exportCSV('participantes')">📊 Participantes CSV</button>
+          <button class="btn btn-s" onclick="exportCSV('finanzas')">💰 Finanzas CSV</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /wrap -->
+
+<!-- ======== MODALES ======== -->
+
+<!-- Participante -->
+<div class="mo" id="m-p">
+  <div class="md md-md">
+    <div class="mh"><h3 id="m-p-title">Nuevo participante</h3><button class="btn-ic" onclick="closeM('m-p')">✕</button></div>
+    <div class="mb">
+      <input type="hidden" id="p-id">
+      <div class="fr fr2">
+        <div class="f"><label>Nombre *</label><input id="p-nombre" placeholder="Juan"></div>
+        <div class="f"><label>Apellido *</label><input id="p-apellido" placeholder="García"></div>
+      </div>
+      <div class="f"><label>Notas</label><textarea id="p-notas" placeholder="Opcional..."></textarea></div>
+    </div>
+    <div class="mf"><button class="btn btn-s" onclick="closeM('m-p')">Cancelar</button><button class="btn btn-p" onclick="saveP()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- Jornada -->
+<div class="mo" id="m-j">
+  <div class="md md-lg">
+    <div class="mh"><h3 id="m-j-title">Nueva jornada</h3><button class="btn-ic" onclick="closeM('m-j')">✕</button></div>
+    <div class="mb">
+      <input type="hidden" id="j-id">
+      <div class="f"><label>Título *</label><input id="j-titulo" placeholder="Preparación del kiosco"></div>
+      <div class="fr fr3">
+        <div class="f"><label>Fecha *</label><input id="j-fecha" type="date"></div>
+        <div class="f"><label>Hora</label><input id="j-hora" type="time"></div>
+        <div class="f"><label>Tipo</label>
+          <select id="j-tipo">
+            <option value="construccion">Construcción</option>
+            <option value="venta">Venta</option>
+            <option value="organizacion">Organización</option>
+            <option value="limpieza">Limpieza</option>
+            <option value="compra">Compra de materiales</option>
+            <option value="decoracion">Decoración</option>
+            <option value="otro">Otro</option>
+          </select>
+        </div>
+      </div>
+      <div class="f"><label>Proyecto relacionado</label><select id="j-proy"><option value="">Sin proyecto</option></select></div>
+      <div class="f"><label>Descripción</label><textarea id="j-desc" placeholder="Descripción..."></textarea></div>
+      <div>
+        <div class="ct" style="margin-bottom:8px;font-size:12px">Puntos por participante</div>
+        <div id="j-pts" style="display:flex;flex-direction:column;gap:5px;max-height:220px;overflow-y:auto"></div>
+      </div>
+      <div class="f"><label>Notas</label><textarea id="j-notas" placeholder="Comentarios adicionales..."></textarea></div>
+    </div>
+    <div class="mf"><button class="btn btn-s" onclick="closeM('m-j')">Cancelar</button><button class="btn btn-p" onclick="saveJ()">Guardar jornada</button></div>
+  </div>
+</div>
+
+<!-- Proyecto -->
+<div class="mo" id="m-proy">
+  <div class="md md-md">
+    <div class="mh"><h3 id="m-proy-title">Nuevo proyecto</h3><button class="btn-ic" onclick="closeM('m-proy')">✕</button></div>
+    <div class="mb">
+      <input type="hidden" id="proy-id">
+      <div class="f"><label>Nombre *</label><input id="proy-nombre" placeholder="Venta de kiosco"></div>
+      <div class="f"><label>Descripción</label><textarea id="proy-desc" placeholder="Descripción..."></textarea></div>
+      <div class="fr fr2">
+        <div class="f"><label>Fecha inicio</label><input id="proy-ini" type="date"></div>
+        <div class="f"><label>Fecha fin</label><input id="proy-fin" type="date"></div>
+      </div>
+      <div class="f"><label>Estado</label><select id="proy-est"><option value="activo">Activo</option><option value="finalizado">Finalizado</option></select></div>
+    </div>
+    <div class="mf"><button class="btn btn-s" onclick="closeM('m-proy')">Cancelar</button><button class="btn btn-p" onclick="saveProy()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- Operación (ingreso/gasto) -->
+<div class="mo" id="m-op">
+  <div class="md md-md">
+    <div class="mh"><h3 id="m-op-title">Nueva operación</h3><button class="btn-ic" onclick="closeM('m-op')">✕</button></div>
+    <div class="mb">
+      <input type="hidden" id="op-id">
+      <input type="hidden" id="op-tipo">
+      <div class="f"><label>Nombre *</label><input id="op-nombre" placeholder="Rifa del curso"></div>
+      <div class="f"><label>Descripción</label><textarea id="op-desc" placeholder="Descripción..."></textarea></div>
+      <div class="f"><label>Proyecto relacionado</label><select id="op-proy"><option value="">Sin proyecto</option></select></div>
+    </div>
+    <div class="mf"><button class="btn btn-s" onclick="closeM('m-op')">Cancelar</button><button class="btn btn-p" onclick="saveOp()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- Movimiento -->
+<div class="mo" id="m-mov">
+  <div class="md md-sm">
+    <div class="mh"><h3>Nuevo movimiento</h3><button class="btn-ic" onclick="closeM('m-mov')">✕</button></div>
+    <div class="mb">
+      <input type="hidden" id="mov-opid">
+      <input type="hidden" id="mov-tipo">
+      <div class="f"><label>Fecha *</label><input id="mov-fecha" type="date"></div>
+      <div class="f"><label>Descripción *</label><input id="mov-desc" placeholder="Venta de 5 rifas"></div>
+      <div class="f"><label>Monto *</label><input id="mov-monto" type="number" placeholder="15000"></div>
+    </div>
+    <div class="mf"><button class="btn btn-s" onclick="closeM('m-mov')">Cancelar</button><button class="btn btn-p" onclick="saveMov()">Agregar</button></div>
+  </div>
+</div>
+
+<!-- Inventario -->
+<div class="mo" id="m-inv">
+  <div class="md md-md">
+    <div class="mh"><h3 id="m-inv-title">Agregar producto</h3><button class="btn-ic" onclick="closeM('m-inv')">✕</button></div>
+    <div class="mb">
+      <input type="hidden" id="inv-id">
+      <div class="fr fr2">
+        <div class="f"><label>Nombre *</label><input id="inv-nombre" placeholder="Chocolatín"></div>
+        <div class="f"><label>Categoría</label><input id="inv-cat" placeholder="Golosinas"></div>
+      </div>
+      <div class="fr fr3">
+        <div class="f"><label>Stock</label><input id="inv-stock" type="number" value="0"></div>
+        <div class="f"><label>P. Compra</label><input id="inv-pc" type="number" value="0"></div>
+        <div class="f"><label>P. Venta</label><input id="inv-pv" type="number" value="0"></div>
+      </div>
+      <div class="f"><label>Observaciones</label><textarea id="inv-obs" placeholder="Notas..."></textarea></div>
+    </div>
+    <div class="mf"><button class="btn btn-s" onclick="closeM('m-inv')">Cancelar</button><button class="btn btn-p" onclick="saveInv()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- Anuncio -->
+<div class="mo" id="m-an">
+  <div class="md md-md">
+    <div class="mh"><h3>Nuevo anuncio</h3><button class="btn-ic" onclick="closeM('m-an')">✕</button></div>
+    <div class="mb">
+      <div class="f"><label>Título *</label><input id="an-titulo" placeholder="Reunión del curso"></div>
+      <div class="f"><label>Descripción *</label><textarea id="an-desc" placeholder="Detalles..." style="min-height:90px"></textarea></div>
+    </div>
+    <div class="mf"><button class="btn btn-s" onclick="closeM('m-an')">Cancelar</button><button class="btn btn-p" onclick="saveAn()">Publicar</button></div>
+  </div>
+</div>
+
+<!-- Confirmar -->
+<div class="mo" id="m-confirm">
+  <div class="md md-sm">
+    <div class="mh"><h3>Confirmar</h3><button class="btn-ic" onclick="closeM('m-confirm')">✕</button></div>
+    <div class="mb"><p id="confirm-msg" style="color:var(--muted)"></p></div>
+    <div class="mf"><button class="btn btn-s" onclick="closeM('m-confirm')">Cancelar</button><button class="btn btn-d" id="confirm-ok">Confirmar</button></div>
+  </div>
+</div>
+
+<script>
+// ── FIREBASE ──────────────────────────────────────────────────────────────
+firebase.initializeApp({
+  apiKey:"AIzaSyBoN3e9zApuNi2BFiGx_i0CuEpCjzURJNU",
+  authDomain:"wydnova-registro.firebaseapp.com",
+  projectId:"wydnova-registro",
+  storageBucket:"wydnova-registro.firebasestorage.app",
+  messagingSenderId:"1011639283894",
+  appId:"1:1011639283894:web:48048ee9b1bc4f085ff617"
+});
+const db = firebase.firestore();
+
+// ── STATE ─────────────────────────────────────────────────────────────────
+const S = {
+  participantes:[], proyectos:[], jornadas:[],
+  ingresos:[], gastos:[], anuncios:[], inventario:[],
+  config:{ nombreCurso:'Mi Curso', mostrarRanking:true, mostrarBalance:true, mostrarDinero:true, mostrarJornadas:true, mostrarProyectos:true },
+  jtab:'todas', proytab:'activos',
+  fintab:{ ingreso:'activas', gasto:'activas' }
+};
+
+// ── HELPERS ───────────────────────────────────────────────────────────────
+const $m = id => document.getElementById(id);
+const fm = n => new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',minimumFractionDigits:0}).format(n||0);
+const fd = v => { if(!v)return'—'; try{ const d=v?.toDate?v.toDate():new Date(v); return d.toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'numeric'}); }catch{return'—'} };
+const ini = n => (n||'').split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
+const fut = f => f && new Date(f) >= new Date(new Date().toDateString());
+const totalIng = () => S.ingresos.reduce((s,o)=>s+(o.total||0),0);
+const totalGas = () => S.gastos.reduce((s,o)=>s+(o.total||0),0);
+const bal = () => totalIng()-totalGas();
+const totalPts = () => S.participantes.reduce((s,p)=>s+(p.puntos||0),0);
+const pct = p => { const t=totalPts(); return t>0?(p.puntos||0)/t*100:0; };
+const monto = p => { const t=totalPts(); return t>0?(p.puntos||0)/t*bal():0; };
+const TS = () => firebase.firestore.FieldValue.serverTimestamp();
+
+function toast(msg,ok=true){
+  const el=document.createElement('div');
+  el.className='ti';el.innerHTML=`${ok?'✅':'❌'} ${msg}`;
+  $m('toast').appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('show'));
+  setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),300)},2800);
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────
+const openM = id => $m(id).classList.add('open');
+const closeM = id => $m(id).classList.remove('open');
+document.querySelectorAll('.mo').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')}));
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.querySelectorAll('.mo.open').forEach(o=>o.classList.remove('open')); });
+
+function confirm_(msg,cb){
+  $m('confirm-msg').textContent=msg;
+  $m('confirm-ok').onclick=()=>{cb();closeM('m-confirm')};
+  openM('m-confirm');
+}
+
+// ── FIRESTORE LISTENERS ───────────────────────────────────────────────────
+db.collection('participantes').orderBy('puntos','desc').onSnapshot(s=>{
+  S.participantes=s.docs.map(d=>({id:d.id,...d.data()}));
+  renderAll();
+});
+db.collection('proyectos').orderBy('creadoEn','desc').onSnapshot(s=>{
+  S.proyectos=s.docs.map(d=>({id:d.id,...d.data()}));
+  fillProySels();renderAll();
+});
+db.collection('jornadas').orderBy('fecha','desc').onSnapshot(s=>{
+  S.jornadas=s.docs.map(d=>({id:d.id,...d.data()}));renderAll();
+});
+db.collection('operacionesIngreso').orderBy('creadoEn','desc').onSnapshot(s=>{
+  S.ingresos=s.docs.map(d=>({id:d.id,...d.data()}));renderAll();
+});
+db.collection('operacionesGasto').orderBy('creadoEn','desc').onSnapshot(s=>{
+  S.gastos=s.docs.map(d=>({id:d.id,...d.data()}));renderAll();
+});
+db.collection('anuncios').orderBy('creadoEn','desc').onSnapshot(s=>{
+  S.anuncios=s.docs.map(d=>({id:d.id,...d.data()}));renderAll();
+});
+db.collection('inventario').onSnapshot(s=>{
+  S.inventario=s.docs.map(d=>({id:d.id,...d.data()}));renderInv();
+});
+db.collection('config').doc('general').onSnapshot(s=>{
+  if(s.exists){ Object.assign(S.config,s.data()); applyConfig(); }
+});
+
+function applyConfig(){
+  $m('sb-nombre').textContent=S.config.nombreCurso||'Mi Curso';
+  const n=$m('cfg-nombre');if(n)n.value=S.config.nombreCurso||'';
+  const a=$m('cfg-anio');if(a)a.value=S.config.anio||'';
+  ['mostrarRanking','mostrarBalance','mostrarDinero','mostrarJornadas','mostrarProyectos'].forEach(k=>{
+    const t=$m('t-'+k);if(t)t.classList.toggle('on',S.config[k]!==false);
+  });
+}
+
+function fillProySels(){
+  const opts='<option value="">Sin proyecto</option>'+S.proyectos.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
+  ['j-proy','op-proy'].forEach(id=>{ const el=$m(id);if(el){const v=el.value;el.innerHTML=opts;el.value=v;} });
+}
+
+// ── RENDER ALL ────────────────────────────────────────────────────────────
+function renderAll(){
+  renderDash();renderP();renderJ();renderProy();
+  renderFin('ingreso');renderFin('gasto');renderReparto();renderAn();
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────────────
+function renderDash(){
+  const b=bal();
+  $m('d-bal').textContent=fm(b);
+  $m('d-bal').className='sv '+(b>=0?'txt-g':'txt-r');
+  $m('d-ing').textContent=fm(totalIng());
+  $m('d-gas').textContent=fm(totalGas());
+  $m('d-pts').textContent=totalPts();
+
+  // Ranking top5
+  const top=$m('d-ranking');
+  const t5=S.participantes.slice(0,5);
+  top.innerHTML=t5.length?t5.map((p,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(42,42,56,.4)">
+      <span style="width:16px;font-size:11px;font-weight:700;color:${i===0?'var(--amber)':i===1?'#cbd5e1':i===2?'#92400e':'var(--subtle)'}">${i+1}</span>
+      <div class="av" style="width:26px;height:26px;font-size:10px">${ini(p.nombre+' '+p.apellido)}</div>
+      <span style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.nombre} ${p.apellido}</span>
+      <span class="badge b-i">${p.puntos||0} pts</span>
+    </div>`).join('')
+    :'<p class="muted sm" style="text-align:center;padding:16px">Sin participantes</p>';
+
+  // Próximas
+  const prox=$m('d-proximas');
+  const ps=S.jornadas.filter(j=>fut(j.fecha)).sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).slice(0,4);
+  prox.innerHTML=ps.length?ps.map(j=>`
+    <div style="display:flex;align-items:center;gap:9px;padding:7px;background:var(--bg3);border-radius:9px;margin-bottom:5px">
+      <div style="width:36px;height:36px;border-radius:8px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
+        <span style="font-size:9px;color:#818cf8;font-weight:700;line-height:1">${new Date(j.fecha).toLocaleString('es-AR',{month:'short'}).toUpperCase()}</span>
+        <span style="font-size:13px;color:#818cf8;font-weight:700;line-height:1">${new Date(j.fecha).getDate()}</span>
+      </div>
+      <div style="min-width:0"><div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${j.titulo}</div><div class="muted sm">${j.tipo}</div></div>
+    </div>`).join('')
+    :'<p class="muted sm" style="text-align:center;padding:16px">No hay jornadas próximas</p>';
+
+  // Anuncios
+  const ae=$m('d-anuncios');
+  ae.innerHTML=S.anuncios.slice(0,3).map(a=>`
+    <div style="padding:8px 10px;background:var(--bg3);border-radius:9px;margin-bottom:5px">
+      <div style="font-size:12px;font-weight:500">${a.titulo}</div>
+      <div class="muted sm" style="margin-top:2px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical">${a.descripcion}</div>
+    </div>`).join('')||'<p class="muted sm" style="text-align:center;padding:16px">Sin anuncios</p>';
+}
+
+// ── PARTICIPANTES ─────────────────────────────────────────────────────────
+function renderP(){
+  const q=($m('sp')?.value||'').toLowerCase();
+  const list=S.participantes.filter(p=>`${p.nombre} ${p.apellido}`.toLowerCase().includes(q));
+  $m('p-cnt').textContent=`${S.participantes.length} alumnos`;
+  const tbody=$m('tb-p');
+  if(!list.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><div>Sin participantes</div></div></td></tr>`;return;}
+  tbody.innerHTML=list.map(p=>{
+    const rank=S.participantes.findIndex(x=>x.id===p.id)+1;
+    return `<tr>
+      <td><span style="font-weight:700;font-size:11px;color:${rank===1?'var(--amber)':rank===2?'#cbd5e1':rank===3?'#92400e':'var(--subtle)'}">${rank}</span></td>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="av" style="width:28px;height:28px;font-size:10px">${ini(p.nombre+' '+p.apellido)}</div><span class="fw">${p.nombre} ${p.apellido}</span></div></td>
+      <td><span class="fw txt-i">${p.puntos||0}</span></td>
+      <td class="muted">${pct(p).toFixed(1)}%</td>
+      <td class="txt-g fw">${fm(monto(p))}</td>
+      <td><span class="badge ${p.activo!==false?'b-g':'b-m'}">${p.activo!==false?'Activo':'Inactivo'}</span></td>
+      <td><div class="ra">
+        <button class="btn-ic" onclick="editP('${p.id}')">✏️</button>
+        <button class="btn-ic" onclick="toggleP('${p.id}',${p.activo!==false})">${p.activo!==false?'🔒':'🔓'}</button>
+        <button class="btn-ic" onclick="confirm_('¿Eliminar a ${p.nombre} ${p.apellido}?',()=>delP('${p.id}'))">🗑️</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function resetFormP(){ ['p-id','p-nombre','p-apellido','p-notas'].forEach(i=>{const el=$m(i);if(el)el.value='';}); $m('m-p-title').textContent='Nuevo participante'; }
+function editP(id){
+  const p=S.participantes.find(x=>x.id===id);if(!p)return;
+  $m('p-id').value=id;$m('p-nombre').value=p.nombre||'';$m('p-apellido').value=p.apellido||'';$m('p-notas').value=p.notas||'';
+  $m('m-p-title').textContent='Editar participante';openM('m-p');
+}
+async function saveP(){
+  const id=$m('p-id').value, nombre=$m('p-nombre').value.trim(), apellido=$m('p-apellido').value.trim();
+  if(!nombre){toast('Nombre requerido',false);return;}
+  const data={nombre,apellido,notas:$m('p-notas').value.trim()};
+  try{
+    if(id){await db.collection('participantes').doc(id).update(data);toast('Actualizado');}
+    else{await db.collection('participantes').add({...data,puntos:0,jornadasCount:0,activo:true,creadoEn:TS()});toast('Alumno agregado');}
+    closeM('m-p');
+  }catch(e){toast(e.message,false);}
+}
+async function toggleP(id,activo){ await db.collection('participantes').doc(id).update({activo:!activo}); }
+async function delP(id){ await db.collection('participantes').doc(id).delete();toast('Eliminado'); }
+
+// ── JORNADAS ──────────────────────────────────────────────────────────────
+function jtab(t,el){ S.jtab=t; document.querySelectorAll('#tabs-j .tab').forEach(x=>x.classList.remove('on')); el.classList.add('on'); renderJ(); }
+
+const TIPO_LABEL={construccion:'Construcción',venta:'Venta',organizacion:'Organización',limpieza:'Limpieza',compra:'Compra',decoracion:'Decoración',otro:'Otro'};
+
+function renderJ(){
+  let list=S.jornadas;
+  if(S.jtab==='futuras')list=list.filter(j=>fut(j.fecha));
+  if(S.jtab==='pasadas')list=list.filter(j=>!fut(j.fecha));
+  $m('j-cnt').textContent=`${S.jornadas.length} jornadas`;
+  const grid=$m('grid-j');
+  if(!list.length){grid.innerHTML=`<div class="card" style="grid-column:1/-1"><div class="empty"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg><div>Sin jornadas</div></div></div>`;return;}
+  grid.innerHTML=list.map(j=>{
+    const proy=S.proyectos.find(p=>p.id===j.proyectoId);
+    const pCount=Object.values(j.participaciones||{}).filter(v=>v>0).length;
+    const f=fut(j.fecha);
+    return `<div class="card" style="position:relative">
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px;justify-content:space-between;align-items:flex-start">
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <span class="badge ${f?'b-i':'b-g'}">${f?'Próxima':'Realizada'}</span>
+          <span class="badge b-m">${TIPO_LABEL[j.tipo]||j.tipo}</span>
+          ${proy?`<span class="badge b-m">${proy.nombre}</span>`:''}
+        </div>
+        <div style="display:flex;gap:2px">
+          <button class="btn-ic" onclick="editJ('${j.id}')">✏️</button>
+          <button class="btn-ic" onclick="confirm_('¿Eliminar jornada «${j.titulo}»? Se revertirán los puntos.',()=>delJ('${j.id}'))">🗑️</button>
+        </div>
+      </div>
+      <div class="fw" style="margin-bottom:3px">${j.titulo}</div>
+      ${j.descripcion?`<div class="muted sm" style="margin-bottom:7px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${j.descripcion}</div>`:''}
+      <div class="muted sm" style="display:flex;gap:10px;flex-wrap:wrap">
+        <span>📅 ${fd(j.fecha)}</span>
+        ${j.hora?`<span>🕐 ${j.hora}</span>`:''}
+        ${pCount?`<span>👥 ${pCount} pts asignados</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function resetFormJ(){
+  ['j-id','j-titulo','j-fecha','j-hora','j-desc','j-notas'].forEach(i=>{const el=$m(i);if(el)el.value='';});
+  $m('j-tipo').value='otro';$m('j-proy').value='';
+  fillProySels();
+  renderJPts({});
+  $m('m-j-title').textContent='Nueva jornada';
+}
+
+function renderJPts(participaciones){
+  const activos=S.participantes.filter(p=>p.activo!==false);
+  $m('j-pts').innerHTML=activos.length?activos.map(p=>`
+    <div class="pi-row">
+      <div class="av" style="width:24px;height:24px;font-size:9px">${ini(p.nombre+' '+p.apellido)}</div>
+      <span>${p.nombre} ${p.apellido}</span>
+      <input class="pi-inp" type="number" min="0" id="pts-${p.id}" value="${participaciones[p.id]||''}" placeholder="0">
+      <span class="muted sm">pts</span>
+    </div>`).join('')
+    :'<p class="muted sm">Sin participantes activos</p>';
+}
+
+function editJ(id){
+  const j=S.jornadas.find(x=>x.id===id);if(!j)return;
+  $m('j-id').value=id;$m('j-titulo').value=j.titulo||'';$m('j-fecha').value=j.fecha||'';
+  $m('j-hora').value=j.hora||'';$m('j-tipo').value=j.tipo||'otro';
+  $m('j-desc').value=j.descripcion||'';$m('j-notas').value=j.notas||'';
+  fillProySels();setTimeout(()=>$m('j-proy').value=j.proyectoId||'',50);
+  renderJPts(j.participaciones||{});
+  $m('m-j-title').textContent='Editar jornada';openM('m-j');
+}
+
+async function saveJ(){
+  const id=$m('j-id').value, titulo=$m('j-titulo').value.trim(), fecha=$m('j-fecha').value;
+  if(!titulo||!fecha){toast('Título y fecha requeridos',false);return;}
+  const participaciones={};
+  S.participantes.filter(p=>p.activo!==false).forEach(p=>{
+    const inp=$m('pts-'+p.id);if(inp)participaciones[p.id]=Number(inp.value)||0;
+  });
+  const data={titulo,fecha,hora:$m('j-hora').value,tipo:$m('j-tipo').value,proyectoId:$m('j-proy').value||null,descripcion:$m('j-desc').value.trim(),notas:$m('j-notas').value.trim(),participaciones};
+  try{
+    const batch=db.batch();
+    if(id){
+      const old=S.jornadas.find(x=>x.id===id);
+      const oldP=old?.participaciones||{};
+      batch.update(db.collection('jornadas').doc(id),data);
+      const allIds=new Set([...Object.keys(oldP),...Object.keys(participaciones)]);
+      for(const pid of allIds){
+        const diff=(participaciones[pid]||0)-(oldP[pid]||0);
+        if(diff!==0){const p=S.participantes.find(x=>x.id===pid);if(p)batch.update(db.collection('participantes').doc(pid),{puntos:Math.max(0,(p.puntos||0)+diff)});}
+      }
+      toast('Jornada actualizada');
+    }else{
+      const ref=db.collection('jornadas').doc();
+      batch.set(ref,{...data,creadoEn:TS()});
+      for(const [pid,pts] of Object.entries(participaciones)){
+        if(pts>0){const p=S.participantes.find(x=>x.id===pid);if(p)batch.update(db.collection('participantes').doc(pid),{puntos:(p.puntos||0)+pts,jornadasCount:(p.jornadasCount||0)+1});}
+      }
+      toast('Jornada creada');
+    }
+    await batch.commit();closeM('m-j');
+  }catch(e){toast(e.message,false);}
+}
+
+async function delJ(id){
+  const j=S.jornadas.find(x=>x.id===id);
+  const batch=db.batch();
+  for(const [pid,pts] of Object.entries(j?.participaciones||{})){
+    if(pts>0){const p=S.participantes.find(x=>x.id===pid);if(p)batch.update(db.collection('participantes').doc(pid),{puntos:Math.max(0,(p.puntos||0)-pts),jornadasCount:Math.max(0,(p.jornadasCount||0)-1)});}
+  }
+  batch.delete(db.collection('jornadas').doc(id));
+  await batch.commit();toast('Jornada eliminada');
+}
+
+// ── PROYECTOS ─────────────────────────────────────────────────────────────
+function proytab(t,el){ S.proytab=t; document.querySelectorAll('#p-proyectos .tab').forEach(x=>x.classList.remove('on')); el.classList.add('on'); renderProy(); }
+
+function renderProy(){
+  const list=S.proyectos.filter(p=>S.proytab==='activos'?p.estado!=='finalizado':p.estado==='finalizado');
+  $m('proy-cnt').textContent=`${S.proyectos.length} proyectos`;
+  const grid=$m('grid-proy');
+  if(!list.length){grid.innerHTML=`<div class="card" style="grid-column:1/-1"><div class="empty"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><div>Sin proyectos</div></div></div>`;return;}
+  grid.innerHTML=list.map(p=>{
+    const ing=S.ingresos.filter(o=>o.proyectoId===p.id).reduce((s,o)=>s+(o.total||0),0);
+    const gas=S.gastos.filter(o=>o.proyectoId===p.id).reduce((s,o)=>s+(o.total||0),0);
+    const jors=S.jornadas.filter(j=>j.proyectoId===p.id).length;
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <span class="badge ${p.estado==='finalizado'?'b-m':'b-g'}">${p.estado==='finalizado'?'✓ Finalizado':'⚡ Activo'}</span>
+        <div style="display:flex;gap:2px">
+          <button class="btn-ic" onclick="editProy('${p.id}')">✏️</button>
+          <button class="btn-ic" onclick="confirm_('¿Eliminar «${p.nombre}»?',()=>delProy('${p.id}'))">🗑️</button>
+        </div>
+      </div>
+      <div class="fw" style="margin-bottom:3px">${p.nombre}</div>
+      ${p.descripcion?`<div class="muted sm" style="margin-bottom:8px">${p.descripcion}</div>`:''}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding-top:8px;border-top:1px solid var(--border);margin-top:8px">
+        <div style="text-align:center"><div class="muted" style="font-size:10px">Ingresos</div><div class="txt-g fw sm">${fm(ing)}</div></div>
+        <div style="text-align:center"><div class="muted" style="font-size:10px">Gastos</div><div class="txt-r fw sm">${fm(gas)}</div></div>
+        <div style="text-align:center"><div class="muted" style="font-size:10px">Jornadas</div><div class="txt-i fw sm">${jors}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function resetFormProy(){ ['proy-id','proy-nombre','proy-desc','proy-ini','proy-fin'].forEach(i=>{const el=$m(i);if(el)el.value='';}); $m('proy-est').value='activo'; $m('m-proy-title').textContent='Nuevo proyecto'; }
+function editProy(id){
+  const p=S.proyectos.find(x=>x.id===id);if(!p)return;
+  $m('proy-id').value=id;$m('proy-nombre').value=p.nombre||'';$m('proy-desc').value=p.descripcion||'';
+  $m('proy-ini').value=p.fechaInicio||'';$m('proy-fin').value=p.fechaFin||'';$m('proy-est').value=p.estado||'activo';
+  $m('m-proy-title').textContent='Editar proyecto';openM('m-proy');
+}
+async function saveProy(){
+  const id=$m('proy-id').value, nombre=$m('proy-nombre').value.trim();
+  if(!nombre){toast('Nombre requerido',false);return;}
+  const data={nombre,descripcion:$m('proy-desc').value.trim(),fechaInicio:$m('proy-ini').value,fechaFin:$m('proy-fin').value,estado:$m('proy-est').value};
+  try{
+    if(id){await db.collection('proyectos').doc(id).update(data);toast('Proyecto actualizado');}
+    else{await db.collection('proyectos').add({...data,creadoEn:TS()});toast('Proyecto creado');}
+    closeM('m-proy');
+  }catch(e){toast(e.message,false);}
+}
+async function delProy(id){ await db.collection('proyectos').doc(id).delete();toast('Eliminado'); }
+
+// ── FINANZAS ──────────────────────────────────────────────────────────────
+function fintab(tipo,tab,el){
+  S.fintab[tipo]=tab;
+  const page=$m('p-'+tipo+'s');
+  page.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));el.classList.add('on');
+  renderFin(tipo);
+}
+
+function renderFin(tipo){
+  const col=tipo==='ingreso'?S.ingresos:S.gastos;
+  const tab=S.fintab[tipo];
+  const list=col.filter(o=>tab==='activas'?o.estado!=='finalizada':o.estado==='finalizada');
+  const total=col.reduce((s,o)=>s+(o.total||0),0);
+  const clr=tipo==='ingreso'?'txt-g':'txt-r';
+  const totalEl=$m('total-'+tipo.slice(0,3));
+  if(totalEl)totalEl.textContent=fm(total)+' total';
+  const listEl=$m('list-'+tipo.slice(0,3));
+  if(!listEl)return;
+  if(!list.length){listEl.innerHTML=`<div class="card"><div class="empty"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><div>Sin operaciones ${tab}</div></div></div>`;return;}
+  listEl.innerHTML=list.map(op=>{
+    const proy=S.proyectos.find(p=>p.id===op.proyectoId);
+    const movs=op.movimientos||[];
+    return `<div class="oc" style="margin-bottom:10px" id="oc-${op.id}">
+      <div class="oc-h">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px">
+            <span class="badge ${op.estado==='finalizada'?'b-m':'b-g'}">${op.estado==='finalizada'?'Finalizada':'Activa'}</span>
+            ${proy?`<span class="badge b-m">${proy.nombre}</span>`:''}
+          </div>
+          <div class="fw">${op.nombre}</div>
+          ${op.descripcion?`<div class="muted sm">${op.descripcion}</div>`:''}
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="text-align:right">
+            <div class="fw ${clr}" style="font-size:17px">${fm(op.total||0)}</div>
+            <div class="muted" style="font-size:11px">${movs.length} movs.</div>
+          </div>
+          <div class="oc-a">
+            <button class="btn-ic" onclick="editOp('${op.id}','${tipo}')" title="Editar">✏️</button>
+            <button class="btn-ic" onclick="toggleOp('${op.id}','${tipo}','${op.estado}')" title="${op.estado==='activa'?'Finalizar':'Reabrir'}">${op.estado==='activa'?'✓':'↺'}</button>
+            <button class="btn-ic" onclick="confirm_('¿Eliminar operación «${op.nombre}»?',()=>delOp('${op.id}','${tipo}'))">🗑️</button>
+          </div>
+        </div>
+      </div>
+      <div style="padding:0 14px 8px;cursor:pointer" onclick="toggleMovs('${op.id}')">
+        <span style="font-size:12px;color:var(--muted)" id="chev-${op.id}">▶ Ver movimientos</span>
+      </div>
+      <div class="movs" id="movs-${op.id}">
+        <div class="movs-inner">
+          ${movs.map(m=>`
+            <div class="mov">
+              <div style="flex:1;min-width:0">
+                <div class="sm fw">${m.descripcion}</div>
+                <div class="muted" style="font-size:11px">${fd(m.fecha)}</div>
+              </div>
+              <span class="fw ${clr}" style="font-size:13px">${fm(m.monto)}</span>
+              <button class="btn-ic mov-del" onclick="delMov('${op.id}','${tipo}','${m.id}')">🗑️</button>
+            </div>`).join('')||'<p class="muted sm" style="text-align:center;padding:6px">Sin movimientos</p>'}
+          <button class="btn btn-s btn-sm" style="width:100%;justify-content:center;margin-top:6px" onclick="openMovModal('${op.id}','${tipo}')">+ Agregar movimiento</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleMovs(id){
+  const el=$m('movs-'+id),chev=$m('chev-'+id);
+  el.classList.toggle('open');
+  chev.textContent=el.classList.contains('open')?'▼ Ocultar movimientos':'▶ Ver movimientos';
+}
+
+function openOpModal(tipo){ $m('op-id').value='';$m('op-tipo').value=tipo;$m('op-nombre').value='';$m('op-desc').value='';fillProySels();$m('op-proy').value='';$m('m-op-title').textContent=`Nueva operación de ${tipo}`;openM('m-op'); }
+function editOp(id,tipo){
+  const col=tipo==='ingreso'?S.ingresos:S.gastos;
+  const op=col.find(x=>x.id===id);if(!op)return;
+  $m('op-id').value=id;$m('op-tipo').value=tipo;$m('op-nombre').value=op.nombre||'';$m('op-desc').value=op.descripcion||'';
+  fillProySels();setTimeout(()=>$m('op-proy').value=op.proyectoId||'',50);
+  $m('m-op-title').textContent='Editar operación';openM('m-op');
+}
+async function saveOp(){
+  const id=$m('op-id').value,tipo=$m('op-tipo').value,nombre=$m('op-nombre').value.trim();
+  if(!nombre){toast('Nombre requerido',false);return;}
+  const col=tipo==='ingreso'?'operacionesIngreso':'operacionesGasto';
+  const data={nombre,descripcion:$m('op-desc').value.trim(),proyectoId:$m('op-proy').value||null};
+  try{
+    if(id){await db.collection(col).doc(id).update(data);toast('Actualizada');}
+    else{await db.collection(col).add({...data,movimientos:[],total:0,estado:'activa',creadoEn:TS()});toast('Operación creada');}
+    closeM('m-op');
+  }catch(e){toast(e.message,false);}
+}
+async function toggleOp(id,tipo,estado){
+  const col=tipo==='ingreso'?'operacionesIngreso':'operacionesGasto';
+  await db.collection(col).doc(id).update({estado:estado==='activa'?'finalizada':'activa'});
+  toast(estado==='activa'?'Finalizada':'Reabierta');
+}
+async function delOp(id,tipo){
+  const col=tipo==='ingreso'?'operacionesIngreso':'operacionesGasto';
+  await db.collection(col).doc(id).delete();toast('Eliminada');
+}
+function openMovModal(opId,tipo){ $m('mov-opid').value=opId;$m('mov-tipo').value=tipo;$m('mov-fecha').value=new Date().toISOString().split('T')[0];$m('mov-desc').value='';$m('mov-monto').value='';openM('m-mov'); }
+async function saveMov(){
+  const opId=$m('mov-opid').value,tipo=$m('mov-tipo').value;
+  const fecha=$m('mov-fecha').value,desc=$m('mov-desc').value.trim(),mnt=Number($m('mov-monto').value);
+  if(!fecha||!desc||!mnt){toast('Todos los campos son requeridos',false);return;}
+  const col=tipo==='ingreso'?'operacionesIngreso':'operacionesGasto';
+  const data=tipo==='ingreso'?S.ingresos:S.gastos;
+  const op=data.find(x=>x.id===opId);if(!op)return;
+  const movs=[...(op.movimientos||[]),{id:Date.now().toString(),fecha,descripcion:desc,monto:mnt}];
+  await db.collection(col).doc(opId).update({movimientos:movs,total:movs.reduce((s,m)=>s+m.monto,0)});
+  toast('Movimiento agregado');closeM('m-mov');
+  setTimeout(()=>{ const el=$m('movs-'+opId);if(el&&!el.classList.contains('open'))toggleMovs(opId); },200);
+}
+async function delMov(opId,tipo,movId){
+  const col=tipo==='ingreso'?'operacionesIngreso':'operacionesGasto';
+  const data=tipo==='ingreso'?S.ingresos:S.gastos;
+  const op=data.find(x=>x.id===opId);if(!op)return;
+  const movs=(op.movimientos||[]).filter(m=>m.id!==movId);
+  await db.collection(col).doc(opId).update({movimientos:movs,total:movs.reduce((s,m)=>s+m.monto,0)});
+  toast('Movimiento eliminado');
+}
+
+// ── REPARTO ───────────────────────────────────────────────────────────────
+function renderReparto(){
+  const montoSim=Number($m('sim-in')?.value)||bal();
+  const t=totalPts();
+  const list=S.participantes.filter(p=>(p.puntos||0)>0);
+  const res=$m('sim-res');
+  if(!list.length){if(res)res.innerHTML='<p class="muted sm" style="text-align:center;padding:14px">Asigná puntos para ver el reparto.</p>';return;}
+  if(res){
+    res.innerHTML=list.map(p=>{
+      const pp=t>0?p.puntos/t*100:0, am=t>0?p.puntos/t*montoSim:0;
+      return `<div class="pr">
+        <span class="pr-n">${p.nombre} ${p.apellido}</span>
+        <div class="pr-b"><div class="pr-f" style="width:${pp}%"></div></div>
+        <span class="pr-p">${pp.toFixed(0)}%</span>
+        <span class="pr-m">${fm(am)}</span>
+      </div>`;
+    }).join('');
+  }
+  const tbody=$m('tb-reparto');
+  if(tbody){
+    tbody.innerHTML=S.participantes.map((p,i)=>{
+      const pp=t>0?pct(p):0, am=t>0?p.puntos/t*bal():0;
+      return `<tr>
+        <td><span style="font-weight:700;font-size:11px;color:${i===0?'var(--amber)':i===1?'#cbd5e1':i===2?'#92400e':'var(--subtle)'}">${i+1}</span></td>
+        <td>${p.nombre} ${p.apellido}</td>
+        <td class="txt-i fw">${p.puntos||0}</td>
+        <td class="muted">${pp.toFixed(1)}%</td>
+        <td class="txt-g fw">${fm(am)}</td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+// ── INVENTARIO ────────────────────────────────────────────────────────────
+function renderInv(){
+  $m('inv-cnt').textContent=`${S.inventario.length} productos`;
+  const tbody=$m('tb-inv');
+  if(!S.inventario.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg><div>Sin productos</div></div></td></tr>`;return;}
+  tbody.innerHTML=S.inventario.map(p=>`<tr>
+    <td class="fw">${p.nombre}</td>
+    <td class="muted">${p.categoria||'—'}</td>
+    <td><span class="badge ${(p.stock||0)>5?'b-g':(p.stock||0)>0?'b-a':'b-r'}">${p.stock||0}</span></td>
+    <td class="muted">${fm(p.precioCompra||0)}</td>
+    <td>${fm(p.precioVenta||0)}</td>
+    <td class="txt-g fw">${fm((p.precioVenta||0)-(p.precioCompra||0))}</td>
+    <td class="muted sm">${p.observaciones||'—'}</td>
+    <td><div class="ra">
+      <button class="btn-ic" onclick="editInv('${p.id}')">✏️</button>
+      <button class="btn-ic" onclick="confirm_('¿Eliminar «${p.nombre}»?',()=>delInv('${p.id}'))">🗑️</button>
+    </div></td>
+  </tr>`).join('');
+}
+
+function resetFormInv(){ ['inv-id','inv-nombre','inv-cat','inv-obs'].forEach(i=>{const el=$m(i);if(el)el.value='';}); ['inv-stock','inv-pc','inv-pv'].forEach(i=>{const el=$m(i);if(el)el.value='0';}); $m('m-inv-title').textContent='Agregar producto'; }
+function editInv(id){
+  const p=S.inventario.find(x=>x.id===id);if(!p)return;
+  $m('inv-id').value=id;$m('inv-nombre').value=p.nombre||'';$m('inv-cat').value=p.categoria||'';
+  $m('inv-stock').value=p.stock||0;$m('inv-pc').value=p.precioCompra||0;$m('inv-pv').value=p.precioVenta||0;
+  $m('inv-obs').value=p.observaciones||'';$m('m-inv-title').textContent='Editar producto';openM('m-inv');
+}
+async function saveInv(){
+  const id=$m('inv-id').value,nombre=$m('inv-nombre').value.trim();
+  if(!nombre){toast('Nombre requerido',false);return;}
+  const data={nombre,categoria:$m('inv-cat').value.trim(),stock:Number($m('inv-stock').value)||0,precioCompra:Number($m('inv-pc').value)||0,precioVenta:Number($m('inv-pv').value)||0,observaciones:$m('inv-obs').value.trim()};
+  try{
+    if(id){await db.collection('inventario').doc(id).update(data);}
+    else{await db.collection('inventario').add({...data,creadoEn:TS()});}
+    toast('Guardado');closeM('m-inv');
+  }catch(e){toast(e.message,false);}
+}
+async function delInv(id){ await db.collection('inventario').doc(id).delete();toast('Eliminado'); }
+
+// ── ANUNCIOS ──────────────────────────────────────────────────────────────
+function renderAn(){
+  $m('an-cnt').textContent=`${S.anuncios.length} publicaciones`;
+  const grid=$m('grid-an');
+  if(!S.anuncios.length){grid.innerHTML=`<div class="card" style="grid-column:1/-1"><div class="empty"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><div>Sin anuncios</div></div></div>`;return;}
+  grid.innerHTML=S.anuncios.map(a=>`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="flex:1"><div class="fw" style="margin-bottom:4px">${a.titulo}</div><div class="muted sm">${a.descripcion}</div><div style="font-size:10px;color:var(--subtle);margin-top:7px">${fd(a.creadoEn)}</div></div>
+        <button class="btn-ic" onclick="confirm_('¿Eliminar este anuncio?',()=>delAn('${a.id}'))">🗑️</button>
+      </div>
+    </div>`).join('');
+}
+async function saveAn(){
+  const t=$m('an-titulo').value.trim(),d=$m('an-desc').value.trim();
+  if(!t||!d){toast('Título y descripción requeridos',false);return;}
+  await db.collection('anuncios').add({titulo:t,descripcion:d,creadoEn:TS()});
+  toast('Anuncio publicado');closeM('m-an');$m('an-titulo').value='';$m('an-desc').value='';
+}
+async function delAn(id){ await db.collection('anuncios').doc(id).delete();toast('Eliminado'); }
+
+// ── CONFIG ────────────────────────────────────────────────────────────────
+function tcfg(k){ S.config[k]=!S.config[k]; const t=$m('t-'+k);if(t)t.classList.toggle('on',S.config[k]); }
+async function saveConfig(){
+  const nombre=$m('cfg-nombre').value.trim()||'Mi Curso';
+  const anio=$m('cfg-anio').value.trim();
+  await db.collection('config').doc('general').set({...S.config,nombreCurso:nombre,anio},{merge:true});
+  toast('Configuración guardada');
+}
+
+// ── EXPORTAR ──────────────────────────────────────────────────────────────
+function exportJSON(){
+  const blob=new Blob([JSON.stringify({participantes:S.participantes,proyectos:S.proyectos,jornadas:S.jornadas,ingresos:S.ingresos,gastos:S.gastos,anuncios:S.anuncios},null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='backup-curso.json';a.click();
+}
+function exportCSV(tipo){
+  let rows,headers;
+  if(tipo==='participantes'){
+    headers=['Nombre','Apellido','Puntos','%','Monto estimado','Jornadas','Estado'];
+    rows=S.participantes.map(p=>[p.nombre,p.apellido,p.puntos||0,pct(p).toFixed(1)+'%',monto(p).toFixed(0),p.jornadasCount||0,p.activo!==false?'Activo':'Inactivo']);
+  }else{
+    headers=['Tipo','Nombre','Estado','Total','Movimientos'];
+    rows=[...S.ingresos.map(o=>['Ingreso',o.nombre,o.estado,o.total||0,(o.movimientos||[]).length]),...S.gastos.map(o=>['Gasto',o.nombre,o.estado,o.total||0,(o.movimientos||[]).length])];
+  }
+  const csv=[headers,...rows].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=tipo+'.csv';a.click();
+}
+
+// ── NAVEGACIÓN ────────────────────────────────────────────────────────────
+const PAGE_NAMES={dashboard:'Dashboard',participantes:'Participantes',jornadas:'Jornadas',proyectos:'Proyectos',ingresos:'Ingresos',gastos:'Gastos',reparto:'Reparto',inventario:'Inventario',anuncios:'Anuncios',config:'Configuración'};
+function nav(name,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.ni').forEach(n=>n.classList.remove('on'));
+  $m('p-'+name).classList.add('on');
+  if(el)el.classList.add('on');
+  $m('page-name').textContent=PAGE_NAMES[name]||name;
+}
+</script>
+</body>
+</html>
